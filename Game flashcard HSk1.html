@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HSK Buddy - Lesson Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mint: '#A8E6CF',
+            skysoft: '#A7D8FF',
+            peach: '#FFD3B6',
+            banana: '#FFF2A6',
+            berry: '#FFAAA5',
+            ink: '#253044'
+          },
+          boxShadow: {
+            soft: '0 18px 40px rgba(64, 84, 116, 0.14)',
+            button: '0 7px 0 rgba(51, 65, 85, 0.16)'
+          },
+          animation: {
+            pop: 'pop 0.34s cubic-bezier(.2,1.4,.4,1)',
+            wiggle: 'wiggle 0.5s ease-in-out',
+            floaty: 'floaty 3s ease-in-out infinite'
+          },
+          keyframes: {
+            pop: {
+              '0%': { transform: 'scale(.88)', opacity: 0 },
+              '100%': { transform: 'scale(1)', opacity: 1 }
+            },
+            wiggle: {
+              '0%, 100%': { transform: 'rotate(0deg)' },
+              '25%': { transform: 'rotate(-3deg)' },
+              '75%': { transform: 'rotate(3deg)' }
+            },
+            floaty: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-8px)' }
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(168, 230, 207, .34), rgba(167, 216, 255, .28)),
+        #fbfcff;
+    }
+
+    .tap-button {
+      transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+    }
+
+    .tap-button:active {
+      transform: translateY(5px) scale(.985);
+      box-shadow: 0 2px 0 rgba(51, 65, 85, .16);
+      filter: saturate(1.08);
+    }
+
+    .answer-card {
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .answer-card:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+
+    .reward-backdrop {
+      background: rgba(37, 48, 68, .36);
+      backdrop-filter: blur(10px);
+    }
+
+    .confetti span {
+      position: absolute;
+      width: 8px;
+      height: 14px;
+      border-radius: 4px;
+      animation: fall 1.2s ease-in forwards;
+    }
+
+    @keyframes fall {
+      from { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+      to { transform: translateY(210px) rotate(250deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="text-ink">
+  <main class="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 py-4 sm:py-6">
+    <header class="flex items-center justify-between gap-3">
+      <button class="tap-button grid h-11 w-11 place-items-center rounded-2xl bg-white shadow-soft" aria-label="Quay lại">
+        <i data-lucide="chevron-left" class="h-5 w-5"></i>
+      </button>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between text-xs font-black uppercase tracking-wide text-slate-500">
+          <span id="lessonLabel">Bài 1</span>
+          <span id="xpText">0 / 480 XP</span>
+        </div>
+        <div class="mt-2 h-4 overflow-hidden rounded-full bg-white shadow-inner">
+          <div id="xpBar" class="h-full w-0 rounded-full bg-gradient-to-r from-mint via-banana to-peach transition-all duration-500"></div>
+        </div>
+      </div>
+      <div class="flex h-11 items-center gap-1.5 rounded-2xl bg-white px-3 font-black text-orange-500 shadow-soft" aria-label="Streak">
+        <i data-lucide="flame" class="h-5 w-5 fill-orange-400 text-orange-400"></i>
+        <span id="streakText">7</span>
+      </div>
+    </header>
+
+    <section class="mt-5 flex items-center justify-between rounded-[2rem] border-4 border-white bg-gradient-to-br from-white to-[#f4fbff] p-4 shadow-soft">
+      <div class="min-w-0">
+        <p id="lessonBrand" class="text-sm font-extrabold text-slate-500">HSK Buddy</p>
+        <h1 id="lessonPrompt" class="mt-1 text-2xl font-black leading-tight">Chọn nghĩa đúng</h1>
+      </div>
+      <div class="animate-floaty rounded-[1.6rem] bg-banana p-3 shadow-button" aria-hidden="true">
+        <div id="lessonMascot" class="grid h-14 w-14 place-items-center rounded-[1.25rem] bg-white text-3xl">汉</div>
+      </div>
+    </section>
+
+    <section class="mt-5 flex-1 rounded-[2rem] border-4 border-white bg-white/88 p-4 shadow-soft">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2 rounded-2xl bg-[#eef9f4] px-3 py-2 text-sm font-black text-emerald-600">
+          <i data-lucide="sparkles" class="h-4 w-4"></i>
+          <span id="comboText">Combo x1</span>
+        </div>
+        <select id="lessonSelect" class="min-w-0 rounded-2xl border-0 bg-[#fff7d4] px-3 py-2 text-sm font-black text-amber-700 outline-none" aria-label="Chọn bài học"></select>
+        <div class="rounded-2xl bg-[#fff7d4] px-3 py-2 text-sm font-black text-amber-700">
+          <span id="progressText">1 / 20</span>
+        </div>
+      </div>
+
+      <article id="vocabCard" class="mt-5 rounded-[2rem] bg-gradient-to-br from-skysoft/60 to-mint/55 p-5 text-center shadow-inner">
+        <p id="cardLabel" class="text-sm font-black uppercase tracking-wide text-slate-500">Từ mới</p>
+        <div id="term" class="mt-3 text-7xl font-black leading-none">你</div>
+        <div id="reading" class="mt-3 inline-flex rounded-full bg-white/80 px-4 py-2 text-lg font-extrabold text-slate-600">nǐ</div>
+      </article>
+
+      <div id="answers" class="mt-5 grid gap-3"></div>
+
+      <div id="feedbackBox" class="mt-4 hidden rounded-3xl border-4 px-4 py-3 text-base font-black" aria-live="polite"></div>
+
+      <button id="continueBtn" class="tap-button mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-3xl bg-emerald-400 text-lg font-black text-white shadow-button disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none" disabled>
+        <span>Tiếp tục</span>
+        <i data-lucide="arrow-right" class="h-5 w-5"></i>
+      </button>
+    </section>
+
+    <nav class="mt-4 grid grid-cols-4 gap-2 rounded-[1.75rem] bg-white p-2 shadow-soft" aria-label="Game navigation">
+      <button class="tap-button grid h-12 place-items-center rounded-2xl bg-[#eef9f4] text-emerald-500" aria-label="Học">
+        <i data-lucide="book-open" class="h-5 w-5"></i>
+      </button>
+      <button class="tap-button grid h-12 place-items-center rounded-2xl text-slate-400" aria-label="Luyện tập">
+        <i data-lucide="dumbbell" class="h-5 w-5"></i>
+      </button>
+      <button class="tap-button grid h-12 place-items-center rounded-2xl text-slate-400" aria-label="Cúp">
+        <i data-lucide="trophy" class="h-5 w-5"></i>
+      </button>
+      <button class="tap-button grid h-12 place-items-center rounded-2xl text-slate-400" aria-label="Hồ sơ">
+        <i data-lucide="user-round" class="h-5 w-5"></i>
+      </button>
+    </nav>
+  </main>
+
+  <div id="rewardPopup" class="reward-backdrop fixed inset-0 z-50 hidden items-center justify-center p-5">
+    <div class="confetti pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true"></div>
+    <section class="relative w-full max-w-sm animate-pop rounded-[2rem] border-4 border-white bg-white p-6 text-center shadow-soft">
+      <div class="mx-auto grid h-24 w-24 place-items-center rounded-[2rem] bg-banana text-5xl shadow-button">
+        <i data-lucide="trophy" class="h-12 w-12 text-amber-500"></i>
+      </div>
+      <h2 id="rewardTitle" class="mt-5 text-3xl font-black">Tuyệt vời!</h2>
+      <p id="rewardMessage" class="mt-2 text-base font-bold text-slate-500">Bạn đã hoàn thành bài học và nhận thêm XP.</p>
+      <div class="mt-5 grid grid-cols-3 gap-3">
+        <div class="rounded-3xl bg-[#eef5ff] p-4">
+          <p class="text-sm font-black text-slate-500">Điểm</p>
+          <p id="finalScore" class="text-2xl font-black text-sky-500">0/20</p>
+        </div>
+        <div class="rounded-3xl bg-[#eef9f4] p-4">
+          <p class="text-sm font-black text-slate-500">XP</p>
+          <p id="rewardXp" class="text-2xl font-black text-emerald-500">+80</p>
+        </div>
+        <div class="rounded-3xl bg-[#fff7d4] p-4">
+          <p class="text-sm font-black text-slate-500">Streak</p>
+          <p id="rewardStreak" class="text-2xl font-black text-orange-500">+1</p>
+        </div>
+      </div>
+      <button id="restartBtn" class="tap-button mt-6 h-14 w-full rounded-3xl bg-berry text-lg font-black text-white shadow-button">
+        Chơi lại
+      </button>
+    </section>
+  </div>
+
+  <script>
+    const HSK_LESSON_MANIFEST = [
+      { id: 'lesson-1', label: 'Bài 1' },
+      { id: 'lesson-2', label: 'Bài 2' },
+      { id: 'lesson-3', label: 'Bài 3' },
+      { id: 'lesson-4', label: 'Bài 4' },
+      { id: 'lesson-5', label: 'Bài 5' },
+      { id: 'lesson-6', label: 'Bài 6' },
+      { id: 'lesson-7', label: 'Bài 7' },
+      { id: 'lesson-8', label: 'Bài 8' },
+      { id: 'lesson-9', label: 'Bài 9' },
+      { id: 'lesson-10', label: 'Bài 10' },
+      { id: 'lesson-11', label: 'Bài 11' },
+      { id: 'lesson-12', label: 'Bài 12' },
+      { id: 'lesson-13', label: 'Bài 13' },
+      { id: 'lesson-14', label: 'Bài 14' },
+      { id: 'lesson-15', label: 'Bài 15' }
+    ];
+
+    const HSK_LESSONS = {
+      'lesson-1': {
+        id: 'lesson-1',
+        label: 'Bài 1',
+        title: 'HSK1 - Bài 1',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '汉',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 1 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '你', reading: 'nǐ', meaning: 'bạn' },
+          { term: '好', reading: 'hǎo', meaning: 'tốt' },
+          { term: '您', reading: 'nín', meaning: 'ngài, bạn (lịch sự)' },
+          { term: '们', reading: 'men', meaning: 'hậu tố số nhiều' },
+          { term: '对不起', reading: 'duìbuqǐ', meaning: 'xin lỗi' },
+          { term: '没关系', reading: 'méi guānxi', meaning: 'không sao' }
+        ]
+      },
+      'lesson-2': {
+        id: 'lesson-2',
+        label: 'Bài 2',
+        title: 'HSK1 - Bài 2',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '谢',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Giỏi lắm!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 2 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '谢谢', reading: 'xièxie', meaning: 'cảm ơn' },
+          { term: '不谢', reading: 'bú xiè', meaning: 'không cần cảm ơn' },
+          { term: '不客气', reading: 'bú kèqi', meaning: 'không có gì' },
+          { term: '再见', reading: 'zàijiàn', meaning: 'tạm biệt' }
+        ]
+      },
+      'lesson-3': {
+        id: 'lesson-3',
+        label: 'Bài 3',
+        title: 'HSK1 - Bài 3',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '名',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 3 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '叫', reading: 'jiào', meaning: 'gọi, tên là' },
+          { term: '什么', reading: 'shénme', meaning: 'cái gì' },
+          { term: '名字', reading: 'míngzi', meaning: 'tên' },
+          { term: '我', reading: 'wǒ', meaning: 'tôi' },
+          { term: '李月', reading: 'Lǐ Yuè', meaning: 'Lý Nguyệt' },
+          { term: '是', reading: 'shì', meaning: 'là' },
+          { term: '学生', reading: 'xuésheng', meaning: 'học sinh' },
+          { term: '老师', reading: 'lǎoshī', meaning: 'giáo viên' },
+          { term: '吗', reading: 'ma', meaning: 'trợ từ nghi vấn' },
+          { term: '中国', reading: 'Zhōngguó', meaning: 'Trung Quốc' },
+          { term: '美国', reading: 'Měiguó', meaning: 'Mỹ' },
+          { term: '人', reading: 'rén', meaning: 'người' }
+        ]
+      },
+      'lesson-4': {
+        id: 'lesson-4',
+        label: 'Bài 4',
+        title: 'HSK1 - Bài 4',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '朋',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 4 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '她', reading: 'tā', meaning: 'cô ấy' },
+          { term: '谁', reading: 'shéi', meaning: 'ai' },
+          { term: '汉语', reading: 'Hànyǔ', meaning: 'tiếng Hán' },
+          { term: '的', reading: 'de', meaning: 'của' },
+          { term: '哪', reading: 'nǎ', meaning: 'nào' },
+          { term: '国', reading: 'guó', meaning: 'nước, quốc gia' },
+          { term: '呢', reading: 'ne', meaning: 'thế còn' },
+          { term: '他', reading: 'tā', meaning: 'anh ấy' },
+          { term: '同学', reading: 'tóngxué', meaning: 'bạn học' },
+          { term: '朋友', reading: 'péngyou', meaning: 'bạn bè' }
+        ]
+      },
+      'lesson-5': {
+        id: 'lesson-5',
+        label: 'Bài 5',
+        title: 'HSK1 - Bài 5',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '家',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 5 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '家', reading: 'jiā', meaning: 'nhà, gia đình' },
+          { term: '有', reading: 'yǒu', meaning: 'có' },
+          { term: '口', reading: 'kǒu', meaning: 'người (lượng từ)' },
+          { term: '女儿', reading: 'nǚ’ér', meaning: 'con gái' },
+          { term: '几', reading: 'jǐ', meaning: 'mấy' },
+          { term: '岁', reading: 'suì', meaning: 'tuổi' },
+          { term: '了', reading: 'le', meaning: 'rồi' },
+          { term: '今年', reading: 'jīnnián', meaning: 'năm nay' },
+          { term: '多', reading: 'duō', meaning: 'nhiều, bao nhiêu' },
+          { term: '大', reading: 'dà', meaning: 'lớn' }
+        ]
+      },
+      'lesson-6': {
+        id: 'lesson-6',
+        label: 'Bài 6',
+        title: 'HSK1 - Bài 6',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '字',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 6 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '会', reading: 'huì', meaning: 'biết, có thể' },
+          { term: '说', reading: 'shuō', meaning: 'nói' },
+          { term: '妈妈', reading: 'māma', meaning: 'mẹ' },
+          { term: '菜', reading: 'cài', meaning: 'món ăn, rau' },
+          { term: '很', reading: 'hěn', meaning: 'rất' },
+          { term: '好吃', reading: 'hǎochī', meaning: 'ngon' },
+          { term: '做', reading: 'zuò', meaning: 'làm' },
+          { term: '写', reading: 'xiě', meaning: 'viết' },
+          { term: '读', reading: 'dú', meaning: 'đọc' },
+          { term: '汉字', reading: 'Hànzì', meaning: 'chữ Hán' },
+          { term: '字', reading: 'zì', meaning: 'chữ' },
+          { term: '怎么', reading: 'zěnme', meaning: 'thế nào' }
+        ]
+      },
+      'lesson-7': {
+        id: 'lesson-7',
+        label: 'Bài 7',
+        title: 'HSK1 - Bài 7',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '书',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 7 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '请', reading: 'qǐng', meaning: 'mời, xin' },
+          { term: '问', reading: 'wèn', meaning: 'hỏi' },
+          { term: '今天', reading: 'jīntiān', meaning: 'hôm nay' },
+          { term: '号', reading: 'hào', meaning: 'ngày, số' },
+          { term: '月', reading: 'yuè', meaning: 'tháng' },
+          { term: '星期', reading: 'xīngqī', meaning: 'tuần, thứ' },
+          { term: '昨天', reading: 'zuótiān', meaning: 'hôm qua' },
+          { term: '明天', reading: 'míngtiān', meaning: 'ngày mai' },
+          { term: '去', reading: 'qù', meaning: 'đi' },
+          { term: '学校', reading: 'xuéxiào', meaning: 'trường học' },
+          { term: '看', reading: 'kàn', meaning: 'xem, nhìn' },
+          { term: '书', reading: 'shū', meaning: 'sách' }
+        ]
+      },
+      'lesson-8': {
+        id: 'lesson-8',
+        label: 'Bài 8',
+        title: 'HSK1 - Bài 8',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '茶',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 8 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '想', reading: 'xiǎng', meaning: 'muốn, nghĩ' },
+          { term: '喝', reading: 'hē', meaning: 'uống' },
+          { term: '茶', reading: 'chá', meaning: 'trà' },
+          { term: '吃', reading: 'chī', meaning: 'ăn' },
+          { term: '米饭', reading: 'mǐfàn', meaning: 'cơm' },
+          { term: '下午', reading: 'xiàwǔ', meaning: 'buổi chiều' },
+          { term: '商店', reading: 'shāngdiàn', meaning: 'cửa hàng' },
+          { term: '买', reading: 'mǎi', meaning: 'mua' },
+          { term: '个', reading: 'gè', meaning: 'cái (lượng từ)' },
+          { term: '杯子', reading: 'bēizi', meaning: 'cốc' },
+          { term: '这', reading: 'zhè', meaning: 'này' },
+          { term: '多少', reading: 'duōshao', meaning: 'bao nhiêu' },
+          { term: '钱', reading: 'qián', meaning: 'tiền' },
+          { term: '块', reading: 'kuài', meaning: 'đồng, tệ' },
+          { term: '那', reading: 'nà', meaning: 'kia' }
+        ]
+      },
+      'lesson-9': {
+        id: 'lesson-9',
+        label: 'Bài 9',
+        title: 'HSK1 - Bài 9',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '猫',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 9 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '小', reading: 'xiǎo', meaning: 'nhỏ' },
+          { term: '猫', reading: 'māo', meaning: 'mèo' },
+          { term: '在', reading: 'zài', meaning: 'ở, tại' },
+          { term: '哪儿', reading: 'nǎr', meaning: 'ở đâu' },
+          { term: '狗', reading: 'gǒu', meaning: 'chó' },
+          { term: '椅子', reading: 'yǐzi', meaning: 'ghế' },
+          { term: '下面', reading: 'xiàmiàn', meaning: 'bên dưới' },
+          { term: '工作', reading: 'gōngzuò', meaning: 'làm việc, công việc' },
+          { term: '儿子', reading: 'érzi', meaning: 'con trai' },
+          { term: '医院', reading: 'yīyuàn', meaning: 'bệnh viện' },
+          { term: '医生', reading: 'yīshēng', meaning: 'bác sĩ' },
+          { term: '爸爸', reading: 'bàba', meaning: 'bố' }
+        ]
+      },
+      'lesson-10': {
+        id: 'lesson-10',
+        label: 'Bài 10',
+        title: 'HSK1 - Bài 10',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '桌',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 10 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '桌子', reading: 'zhuōzi', meaning: 'bàn' },
+          { term: '上', reading: 'shàng', meaning: 'trên' },
+          { term: '电脑', reading: 'diànnǎo', meaning: 'máy tính' },
+          { term: '和', reading: 'hé', meaning: 'và' },
+          { term: '本', reading: 'běn', meaning: 'quyển (lượng từ)' },
+          { term: '里', reading: 'lǐ', meaning: 'trong' },
+          { term: '前面', reading: 'qiánmiàn', meaning: 'phía trước' },
+          { term: '后面', reading: 'hòumiàn', meaning: 'phía sau' },
+          { term: '这儿', reading: 'zhèr', meaning: 'ở đây' },
+          { term: '没有', reading: 'méiyǒu', meaning: 'không có' },
+          { term: '能', reading: 'néng', meaning: 'có thể' },
+          { term: '坐', reading: 'zuò', meaning: 'ngồi' }
+        ]
+      },
+      'lesson-11': {
+        id: 'lesson-11',
+        label: 'Bài 11',
+        title: 'HSK1 - Bài 11',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '点',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 11 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '现在', reading: 'xiànzài', meaning: 'bây giờ' },
+          { term: '点', reading: 'diǎn', meaning: 'giờ, điểm' },
+          { term: '分', reading: 'fēn', meaning: 'phút' },
+          { term: '中午', reading: 'zhōngwǔ', meaning: 'buổi trưa' },
+          { term: '吃饭', reading: 'chīfàn', meaning: 'ăn cơm' },
+          { term: '时候', reading: 'shíhou', meaning: 'lúc, thời gian' },
+          { term: '我们', reading: 'wǒmen', meaning: 'chúng tôi, chúng ta' },
+          { term: '回', reading: 'huí', meaning: 'về, quay lại' },
+          { term: '电影', reading: 'diànyǐng', meaning: 'phim' },
+          { term: '住', reading: 'zhù', meaning: 'sống, ở' },
+          { term: '前', reading: 'qián', meaning: 'trước' },
+          { term: '北京', reading: 'Běijīng', meaning: 'Bắc Kinh' }
+        ]
+      },
+      'lesson-12': {
+        id: 'lesson-12',
+        label: 'Bài 12',
+        title: 'HSK1 - Bài 12',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '天',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 12 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '天气', reading: 'tiānqì', meaning: 'thời tiết' },
+          { term: '怎么样', reading: 'zěnmeyàng', meaning: 'thế nào' },
+          { term: '太', reading: 'tài', meaning: 'quá' },
+          { term: '热', reading: 'rè', meaning: 'nóng' },
+          { term: '冷', reading: 'lěng', meaning: 'lạnh' },
+          { term: '下雨', reading: 'xiàyǔ', meaning: 'mưa' },
+          { term: '小姐', reading: 'xiǎojiě', meaning: 'cô, tiểu thư' },
+          { term: '来', reading: 'lái', meaning: 'đến' },
+          { term: '身体', reading: 'shēntǐ', meaning: 'cơ thể, sức khỏe' },
+          { term: '爱', reading: 'ài', meaning: 'yêu' },
+          { term: '些', reading: 'xiē', meaning: 'một vài' },
+          { term: '水果', reading: 'shuǐguǒ', meaning: 'trái cây' },
+          { term: '水', reading: 'shuǐ', meaning: 'nước' }
+        ]
+      },
+      'lesson-13': {
+        id: 'lesson-13',
+        label: 'Bài 13',
+        title: 'HSK1 - Bài 13',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '电',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 13 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '喂', reading: 'wéi', meaning: 'a lô' },
+          { term: '也', reading: 'yě', meaning: 'cũng' },
+          { term: '学习', reading: 'xuéxí', meaning: 'học tập' },
+          { term: '上午', reading: 'shàngwǔ', meaning: 'buổi sáng' },
+          { term: '睡觉', reading: 'shuìjiào', meaning: 'ngủ' },
+          { term: '电视', reading: 'diànshì', meaning: 'tivi' },
+          { term: '喜欢', reading: 'xǐhuan', meaning: 'thích' },
+          { term: '给', reading: 'gěi', meaning: 'cho, gửi' },
+          { term: '打电话', reading: 'dǎ diànhuà', meaning: 'gọi điện thoại' },
+          { term: '吧', reading: 'ba', meaning: 'nhé, đi' }
+        ]
+      },
+      'lesson-14': {
+        id: 'lesson-14',
+        label: 'Bài 14',
+        title: 'HSK1 - Bài 14',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '衣',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 14 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '东西', reading: 'dōngxi', meaning: 'đồ vật' },
+          { term: '一点儿', reading: 'yìdiǎnr', meaning: 'một chút' },
+          { term: '苹果', reading: 'píngguǒ', meaning: 'táo' },
+          { term: '看见', reading: 'kànjiàn', meaning: 'nhìn thấy' },
+          { term: '先生', reading: 'xiānsheng', meaning: 'ông, ngài' },
+          { term: '开', reading: 'kāi', meaning: 'mở, lái' },
+          { term: '车', reading: 'chē', meaning: 'xe' },
+          { term: '回来', reading: 'huílái', meaning: 'trở về' },
+          { term: '分钟', reading: 'fēnzhōng', meaning: 'phút' },
+          { term: '后', reading: 'hòu', meaning: 'sau' },
+          { term: '衣服', reading: 'yīfu', meaning: 'quần áo' },
+          { term: '漂亮', reading: 'piàoliang', meaning: 'đẹp' },
+          { term: '少', reading: 'shǎo', meaning: 'ít' },
+          { term: '这些', reading: 'zhèxiē', meaning: 'những cái này' },
+          { term: '都', reading: 'dōu', meaning: 'đều' }
+        ]
+      },
+      'lesson-15': {
+        id: 'lesson-15',
+        label: 'Bài 15',
+        title: 'HSK1 - Bài 15',
+        brand: 'HSK Buddy',
+        prompt: 'Chọn nghĩa đúng',
+        mascot: '飞',
+        cardLabel: 'Từ mới',
+        questionCount: 20,
+        initialProgress: { xp: 0, maxXp: 480, streak: 7 },
+        rewards: {
+          correctXp: 20,
+          completionXp: 80,
+          streakBonus: 1,
+          title: 'Tuyệt vời!',
+          message: 'Bạn đã hoàn thành 20 câu hỏi của Bài 15 và nhận thêm XP.'
+        },
+        vocabulary: [
+          { term: '认识', reading: 'rènshi', meaning: 'quen, biết' },
+          { term: '年', reading: 'nián', meaning: 'năm' },
+          { term: '大学', reading: 'dàxué', meaning: 'đại học' },
+          { term: '饭店', reading: 'fàndiàn', meaning: 'nhà hàng, khách sạn' },
+          { term: '出租车', reading: 'chūzūchē', meaning: 'taxi' },
+          { term: '一起', reading: 'yìqǐ', meaning: 'cùng nhau' },
+          { term: '高兴', reading: 'gāoxìng', meaning: 'vui' },
+          { term: '听', reading: 'tīng', meaning: 'nghe' },
+          { term: '飞机', reading: 'fēijī', meaning: 'máy bay' }
+        ]
+      }
+    };
+
+    const DEFAULT_PROGRESS = {
+      xp: 0,
+      maxXp: 480,
+      streak: 7
+    };
+
+    const elements = {
+      lessonLabel: document.getElementById('lessonLabel'),
+      lessonBrand: document.getElementById('lessonBrand'),
+      lessonPrompt: document.getElementById('lessonPrompt'),
+      lessonMascot: document.getElementById('lessonMascot'),
+      lessonSelect: document.getElementById('lessonSelect'),
+      cardLabel: document.getElementById('cardLabel'),
+      term: document.getElementById('term'),
+      reading: document.getElementById('reading'),
+      answers: document.getElementById('answers'),
+      feedbackBox: document.getElementById('feedbackBox'),
+      continueBtn: document.getElementById('continueBtn'),
+      xpBar: document.getElementById('xpBar'),
+      xpText: document.getElementById('xpText'),
+      comboText: document.getElementById('comboText'),
+      progressText: document.getElementById('progressText'),
+      streakText: document.getElementById('streakText'),
+      rewardPopup: document.getElementById('rewardPopup'),
+      restartBtn: document.getElementById('restartBtn'),
+      vocabCard: document.getElementById('vocabCard'),
+      confetti: document.querySelector('.confetti'),
+      rewardTitle: document.getElementById('rewardTitle'),
+      rewardMessage: document.getElementById('rewardMessage'),
+      finalScore: document.getElementById('finalScore'),
+      rewardXp: document.getElementById('rewardXp'),
+      rewardStreak: document.getElementById('rewardStreak')
+    };
+
+    const state = {
+      lesson: null,
+      index: 0,
+      selected: null,
+      currentCorrect: false,
+      combo: 1,
+      correctCount: 0,
+      wrongCount: 0,
+      xp: DEFAULT_PROGRESS.xp,
+      maxXp: DEFAULT_PROGRESS.maxXp,
+      streak: DEFAULT_PROGRESS.streak
+    };
+
+    function iconRefresh() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    function buildChoices(vocabulary, correctMeaning, seed) {
+      const distractors = vocabulary
+        .map((item) => item.meaning)
+        .filter((meaning, index, meanings) => meaning !== correctMeaning && meanings.indexOf(meaning) === index);
+      const split = seed % Math.max(1, distractors.length);
+      const rotated = distractors.slice(split).concat(distractors.slice(0, split));
+      const choices = [correctMeaning, ...rotated.slice(0, 3)];
+
+      while (choices.length < 4) {
+        choices.push(`Đáp án ${choices.length + 1}`);
+      }
+
+      const correctChoice = choices.shift();
+      choices.splice(seed % 4, 0, correctChoice);
+      return choices;
+    }
+
+    function normalizeLesson(lesson) {
+      const cards = Array.from({ length: lesson.questionCount || 20 }, (_, index) => {
+        const item = lesson.vocabulary[index % lesson.vocabulary.length];
+        return {
+          term: item.term,
+          reading: item.reading,
+          correct: item.meaning,
+          choices: buildChoices(lesson.vocabulary, item.meaning, index)
+        };
+      });
+
+      return { ...lesson, cards };
+    }
+
+    function updateXpDisplay() {
+      elements.xpText.textContent = `${state.xp} / ${state.maxXp} XP`;
+      elements.xpBar.style.width = `${Math.min(100, (state.xp / state.maxXp) * 100)}%`;
+    }
+
+    function setProgress(progress) {
+      state.xp = progress?.xp ?? DEFAULT_PROGRESS.xp;
+      state.maxXp = progress?.maxXp ?? DEFAULT_PROGRESS.maxXp;
+      state.streak = progress?.streak ?? DEFAULT_PROGRESS.streak;
+      elements.streakText.textContent = state.streak;
+      updateXpDisplay();
+    }
+
+    function setupLessonSelect(activeId) {
+      elements.lessonSelect.innerHTML = '';
+
+      HSK_LESSON_MANIFEST.forEach((lesson) => {
+        const option = document.createElement('option');
+        option.value = lesson.id;
+        option.textContent = lesson.label;
+        option.selected = lesson.id === activeId;
+        elements.lessonSelect.appendChild(option);
+      });
+    }
+
+    function validateLesson(lesson) {
+      if (!lesson || !Array.isArray(lesson.cards) || lesson.cards.length === 0) {
+        throw new Error('Lesson data must include a non-empty cards array.');
+      }
+
+      lesson.cards.forEach((card, cardIndex) => {
+        const hasChoices = Array.isArray(card.choices) && card.choices.length >= 2;
+        if (!card.term || !hasChoices || !card.correct) {
+          throw new Error(`Card ${cardIndex + 1} is missing term, choices, or correct.`);
+        }
+        if (!card.choices.includes(card.correct)) {
+          throw new Error(`Card ${cardIndex + 1} choices must include the correct answer.`);
+        }
+      });
+    }
+
+    function applyLessonCopy() {
+      const lesson = state.lesson;
+      elements.lessonLabel.textContent = lesson.label || lesson.title || 'Bài học';
+      elements.lessonBrand.textContent = lesson.brand || 'HSK Buddy';
+      elements.lessonPrompt.textContent = lesson.prompt || 'Chọn nghĩa đúng';
+      elements.lessonMascot.textContent = lesson.mascot || '汉';
+      elements.cardLabel.textContent = lesson.cardLabel || 'Từ vựng';
+    }
+
+    function hideFeedback() {
+      elements.feedbackBox.textContent = '';
+      elements.feedbackBox.className = 'mt-4 hidden rounded-3xl border-4 px-4 py-3 text-base font-black';
+    }
+
+    function showFeedback(isCorrect, selectedAnswer, correctAnswer) {
+      elements.feedbackBox.className = `mt-4 rounded-3xl border-4 px-4 py-3 text-base font-black ${
+        isCorrect
+          ? 'border-emerald-200 bg-[#eef9f4] text-emerald-600'
+          : 'border-rose-200 bg-rose-50 text-rose-600'
+      }`;
+      elements.feedbackBox.innerHTML = `
+        <div class="flex items-start gap-3">
+          <i data-lucide="${isCorrect ? 'check-circle-2' : 'x-circle'}" class="mt-0.5 h-6 w-6 shrink-0"></i>
+          <div class="min-w-0">
+            <p class="text-lg">${isCorrect ? 'Correct!' : 'Incorrect'}</p>
+            <p class="mt-1 text-sm font-extrabold text-slate-600">Bạn chọn: ${escapeHtml(selectedAnswer)}</p>
+            <p class="text-sm font-extrabold text-slate-600">Đáp án đúng: ${escapeHtml(correctAnswer)}</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function resetLessonState() {
+      state.index = 0;
+      state.selected = null;
+      state.currentCorrect = false;
+      state.combo = 1;
+      state.correctCount = 0;
+      state.wrongCount = 0;
+      elements.comboText.textContent = 'Combo x1';
+      hideFeedback();
+      elements.rewardPopup.classList.add('hidden');
+      elements.rewardPopup.classList.remove('flex');
+    }
+
+    function renderCurrentCard() {
+      state.selected = null;
+      state.currentCorrect = false;
+      elements.continueBtn.disabled = true;
+      hideFeedback();
+
+      const card = state.lesson.cards[state.index];
+      elements.term.textContent = card.term;
+      elements.reading.textContent = card.reading || '';
+      elements.reading.classList.toggle('hidden', !card.reading);
+      elements.progressText.textContent = `${state.index + 1} / ${state.lesson.cards.length}`;
+      elements.answers.innerHTML = '';
+
+      card.choices.forEach((choice) => {
+        const button = document.createElement('button');
+        button.className = 'answer-card flex min-h-16 items-center justify-between rounded-3xl border-4 border-slate-100 bg-white px-4 py-3 text-left text-lg font-black shadow-sm';
+        button.innerHTML = `<span>${escapeHtml(choice)}</span><i data-lucide="circle" class="h-5 w-5 text-slate-300"></i>`;
+        button.addEventListener('click', () => chooseAnswer(button, choice));
+        elements.answers.appendChild(button);
+      });
+
+      iconRefresh();
+    }
+
+    function chooseAnswer(button, choice) {
+      if (state.selected) return;
+
+      state.selected = choice;
+      elements.continueBtn.disabled = false;
+
+      [...elements.answers.children].forEach((item) => {
+        item.classList.remove('border-emerald-300', 'bg-[#eef9f4]', 'border-rose-300', 'bg-rose-50', 'animate-wiggle');
+        item.classList.add('border-slate-100', 'bg-white');
+        item.querySelector('i').setAttribute('data-lucide', 'circle');
+        item.querySelector('i').className = 'h-5 w-5 text-slate-300';
+      });
+
+      const currentCard = state.lesson.cards[state.index];
+      const isCorrect = choice === currentCard.correct;
+      state.currentCorrect = isCorrect;
+      button.classList.remove('border-slate-100', 'bg-white');
+      button.classList.add(isCorrect ? 'border-emerald-300' : 'border-rose-300', isCorrect ? 'bg-[#eef9f4]' : 'bg-rose-50');
+      button.querySelector('i').setAttribute('data-lucide', isCorrect ? 'check-circle-2' : 'x-circle');
+      button.querySelector('i').className = `h-5 w-5 ${isCorrect ? 'text-emerald-500' : 'text-rose-500'}`;
+
+      if (!isCorrect) {
+        button.classList.add('animate-wiggle');
+        state.combo = 1;
+
+        [...elements.answers.children].forEach((item) => {
+          if (item.querySelector('span').textContent === currentCard.correct) {
+            item.classList.remove('border-slate-100', 'bg-white');
+            item.classList.add('border-emerald-300', 'bg-[#eef9f4]');
+            item.querySelector('i').setAttribute('data-lucide', 'check-circle-2');
+            item.querySelector('i').className = 'h-5 w-5 text-emerald-500';
+          }
+        });
+      }
+
+      [...elements.answers.children].forEach((item) => {
+        item.disabled = true;
+        item.classList.add('cursor-default');
+      });
+
+      showFeedback(isCorrect, choice, currentCard.correct);
+      elements.comboText.textContent = `Combo x${state.combo}`;
+      iconRefresh();
+    }
+
+    function addXp(amount) {
+      state.xp = Math.min(state.maxXp, state.xp + amount);
+      updateXpDisplay();
+    }
+
+    function buildConfetti() {
+      const colors = ['#A8E6CF', '#A7D8FF', '#FFD3B6', '#FFF2A6', '#FFAAA5'];
+      elements.confetti.innerHTML = '';
+
+      for (let i = 0; i < 34; i += 1) {
+        const piece = document.createElement('span');
+        piece.style.left = `${Math.random() * 100}%`;
+        piece.style.top = `${Math.random() * 18}%`;
+        piece.style.background = colors[i % colors.length];
+        piece.style.animationDelay = `${Math.random() * .45}s`;
+        elements.confetti.appendChild(piece);
+      }
+    }
+
+    function showReward() {
+      const reward = state.lesson.rewards || {};
+      const completionXp = reward.completionXp ?? 80;
+      const streakBonus = reward.streakBonus ?? 1;
+
+      state.streak += streakBonus;
+      addXp(completionXp);
+      elements.streakText.textContent = state.streak;
+      elements.rewardTitle.textContent = reward.title || 'Tuyệt vời!';
+      elements.rewardMessage.textContent = `Bạn đúng ${state.correctCount}/${state.lesson.cards.length} câu. ${reward.message || 'Bạn đã hoàn thành bài học và nhận thêm XP.'}`;
+      elements.finalScore.textContent = `${state.correctCount}/${state.lesson.cards.length}`;
+      elements.rewardXp.textContent = `+${completionXp}`;
+      elements.rewardStreak.textContent = `+${streakBonus}`;
+
+      buildConfetti();
+      elements.rewardPopup.classList.remove('hidden');
+      elements.rewardPopup.classList.add('flex');
+      iconRefresh();
+    }
+
+    function continueLesson() {
+      if (!state.selected) return;
+
+      if (state.currentCorrect) {
+        state.correctCount += 1;
+        state.combo += 1;
+        addXp(state.lesson.rewards?.correctXp ?? 20);
+      } else {
+        state.wrongCount += 1;
+      }
+
+      state.index += 1;
+      elements.vocabCard.classList.add('animate-pop');
+      setTimeout(() => elements.vocabCard.classList.remove('animate-pop'), 360);
+
+      if (state.index >= state.lesson.cards.length) {
+        showReward();
+        return;
+      }
+
+      elements.comboText.textContent = `Combo x${state.combo}`;
+      renderCurrentCard();
+    }
+
+    function startLesson(id, options = {}) {
+      const lesson = normalizeLesson(HSK_LESSONS[id]);
+      validateLesson(lesson);
+
+      state.lesson = lesson;
+      setupLessonSelect(lesson.id);
+      applyLessonCopy();
+      resetLessonState();
+
+      if (options.resetProgress || lesson.resetProgressOnStart) {
+        setProgress(lesson.initialProgress);
+      }
+
+      renderCurrentCard();
+      iconRefresh();
+    }
+
+    function getInitialLessonId() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('lesson') || HSK_LESSON_MANIFEST[0].id;
+      return HSK_LESSONS[id] ? id : HSK_LESSON_MANIFEST[0].id;
+    }
+
+    elements.lessonSelect.addEventListener('change', () => {
+      const nextLessonId = elements.lessonSelect.value;
+      window.history.replaceState(null, '', `?lesson=${encodeURIComponent(nextLessonId)}`);
+      startLesson(nextLessonId);
+    });
+
+    elements.continueBtn.addEventListener('click', continueLesson);
+
+    elements.restartBtn.addEventListener('click', () => {
+      resetLessonState();
+      renderCurrentCard();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupLessonSelect(getInitialLessonId());
+      startLesson(getInitialLessonId(), { resetProgress: true });
+    });
+  </script>
+</body>
+</html>
